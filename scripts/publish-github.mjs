@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
-const repo = "larrycaw/julies-cookbook";
+const repo = "larry-software/julies-cookbook";
 const remote = `https://github.com/${repo}.git`;
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, encoding: "utf8", ...options });

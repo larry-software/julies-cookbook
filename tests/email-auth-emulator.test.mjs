@@ -5,7 +5,6 @@ import { getApps, deleteApp } from "firebase/app";
 import { getAuth, applyActionCode, confirmPasswordReset } from "firebase/auth";
 import { createFirebaseEmailAuth } from "../lib/firebase-email-auth.ts";
 import { EmailLoginController } from "../lib/email-login.ts";
-import { emailFlow, validateEmailAccess } from "../functions/src/email-policy.ts";
 
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 const { initializeApp: initializeAdmin, deleteApp: deleteAdmin } = require("firebase-admin/app");
@@ -15,27 +14,26 @@ if (process.env.FIREBASE_AUTH_EMULATOR_HOST !== "127.0.0.1:9099") throw new Erro
 const admin = initializeAdmin({ projectId }, "email-auth-test");
 const adminAuth = getAdminAuth(admin);
 const base = `http://${process.env.FIREBASE_AUTH_EMULATOR_HOST}`;
-const emails = "julie@example.com,isak@example.com";
 
-test("real Firebase Auth creates first password, verifies email, signs in again and resets passwords", async () => {
+
+test("real Firebase Auth creates first password, verifies email, signs in again and resets passwords", { timeout: 60_000 }, async () => {
   await fetch(`${base}/emulator/v1/projects/${projectId}/accounts`, { method: "DELETE" });
   let clientAuth;
   const service = createFirebaseEmailAuth({ projectId, apiKey: "fake-api-key", authDomain: "demo-julies-kokebok.firebaseapp.com" }, {
     name: "email-auth-test", returnUrl: "https://larrycaw.github.io/julies-kokebok/",
     emulator: { authUrl: base, functionsHost: "127.0.0.1", functionsPort: 5001 },
-    policy: {
-      lookup: email => emailFlow(email, emails, email => adminAuth.getUserByEmail(email)),
-      async authorize() { const token = await clientAuth.currentUser.getIdTokenResult(true); validateEmailAccess({ token: token.claims }, emails); },
-    },
+
   });
   const app = getApps().find(app => app.name === "email-auth-test");
   clientAuth = getAuth(app);
   try {
+    await assert.rejects(service.authorize(), { code: "functions/unauthenticated" });
     const flow = new EmailLoginController(service);
     await flow.continueWithEmail("JULIE@EXAMPLE.COM");
     assert.equal(flow.getSnapshot().step, "create");
     await flow.create("A local test passphrase", "A local test passphrase");
     assert.equal(flow.getSnapshot().step, "verify");
+    await assert.rejects(service.authorize(), { code: "functions/permission-denied" });
     await flow.refreshVerification();
     assert.equal(flow.getSnapshot().step, "verify");
     let codes = (await (await fetch(`${base}/emulator/v1/projects/${projectId}/oobCodes`)).json()).oobCodes;
@@ -71,6 +69,14 @@ test("real Firebase Auth creates first password, verifies email, signs in again 
     assert.ok(setup);
     await confirmPasswordReset(clientAuth, setup.oobCode, "An initial test passphrase");
     assert.equal(await service.lookup("isak@example.com"), "login");
-    await assert.rejects(service.lookup("stranger@example.com"), { code: "permission-denied" });
+    await assert.rejects(service.lookup("stranger@example.com"), { code: "functions/permission-denied" });
+    await assert.rejects(service.lookup("x".repeat(255)), { code: "functions/invalid-argument" });
+    const invited = await adminAuth.getUserByEmail("isak@example.com");
+    await adminAuth.updateUser(invited.uid, { disabled: true });
+    await assert.rejects(service.lookup("isak@example.com"), { code: "functions/permission-denied" });
+    await service.signOut();
+    await adminAuth.createUser({ email: "stranger@example.com", emailVerified: true, password: "A stranger test passphrase" });
+    await service.signIn("stranger@example.com", "A stranger test passphrase");
+    await assert.rejects(service.authorize(), { code: "functions/permission-denied" });
   } finally { await service.signOut(); await deleteApp(app); await deleteAdmin(admin); }
 });
