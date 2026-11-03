@@ -1,11 +1,12 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
-import { validateBuildEnvironment, validateBundleModules } from "./scripts/build-policy.ts";
+import { validateBuildEnvironment, validateBundleModules, validateReleaseEnvironment } from "./scripts/build-policy.ts";
 
 export default defineConfig(({ command, mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...process.env };
   validateBuildEnvironment(env);
+  if (command === 'build' && mode === 'release') validateReleaseEnvironment(env);
   if (command === 'build' && mode === 'demo' && env.VITE_COOKBOOK_DEMO !== '1') throw new Error('Demo build requires VITE_COOKBOOK_DEMO=1.');
   if (command === 'build' && mode === 'non-demo' && env.VITE_COOKBOOK_DEMO === '1') throw new Error('Non-demo build cannot enable demo.');
   return {

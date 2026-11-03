@@ -2,8 +2,11 @@
 import { mkdtemp, cp, mkdir, readFile, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
+import { assertFunctionsRuntime } from './build-policy.ts';
 import { spawnSync } from 'node:child_process';
 const root = resolve(import.meta.dirname, '..');
+const browser = process.argv[2] === '--browser';
+if (process.argv.length > (browser ? 3 : 2)) throw new Error('Unexpected test runner arguments');
 const stage = await mkdtemp(join(tmpdir(), 'cookbook-auth-'));
 try {
   await mkdir(join(stage, 'functions'));
@@ -13,7 +16,7 @@ try {
   if (!/^\d+$/.test(expectedMajor)) throw new Error('Functions runtime must declare an explicit Node major.');
   await writeFile(join(stage, 'functions/package.json'), JSON.stringify({ ...functionsPackage, main: 'runtime-check.mjs' }));
   await writeFile(join(stage, 'functions/runtime-check.mjs'), `
-    if (process.versions.node.split('.')[0] !== ${JSON.stringify(expectedMajor)}) throw new Error('Functions emulator runtime mismatch');
+    (${assertFunctionsRuntime.toString()})(process.versions.node, ${JSON.stringify(expectedMajor)});
     console.log('Verified Functions runtime: ' + process.version);
     export * from './lib/index.js';
   `);
@@ -28,9 +31,15 @@ try {
   env.PATH = join(root, 'functions/node_modules/node/bin') + ':' + (env.PATH || '');
   env.XDG_CONFIG_HOME = stage;
   env.CI = 'true';
+  if (browser) {
+    env.PLAYWRIGHT_BROWSERS_PATH = process.env.PLAYWRIGHT_BROWSERS_PATH || join(root, 'node_modules/.cache/ms-playwright');
+  }
+  const command = browser
+    ? `"${process.execPath}" "${join(root, 'node_modules/@playwright/test/cli.js')}" test --config="${join(root, 'playwright.config.ts')}"`
+    : `"${process.execPath}" --test "${join(root, 'tests/email-auth-emulator.test.mjs')}"`;
   const result = spawnSync(join(root, 'functions/node_modules/node/bin/node'), [join(root, 'node_modules/firebase-tools/lib/bin/firebase.js'),
     'emulators:exec', '--only', 'auth,functions', '--project', 'demo-julies-kokebok',
-    `"${process.execPath}" --test "${join(root, 'tests/email-auth-emulator.test.mjs')}"`], { cwd: stage, env, stdio: 'inherit', timeout: 120_000 });
+    command], { cwd: stage, env, stdio: 'inherit', timeout: browser ? 240_000 : 120_000 });
   if (result.error) throw result.error;
   process.exitCode = result.status ?? 1;
 } finally { await rm(stage, { recursive: true, force: true }); }

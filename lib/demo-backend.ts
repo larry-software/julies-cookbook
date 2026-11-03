@@ -12,6 +12,9 @@ export function createDemoBackend(): CookbookBackend & { dispose(): void } {
   return {
     async listRecipes() { return structuredClone([...recipes.values()]); },
     async saveRecipe(input, create) {
+      // Saved copies become editable recipes; sample/display metadata is not data.
+      const { example: _example, updatedAt: _updatedAt, ...data } = input as typeof input & Partial<Pick<Recipe, "example" | "updatedAt">>;
+      input = data;
       const previous = recipes.get(input.id);
       if (create && previous) {
         const { version: ignored, ...incoming } = input;

@@ -32,3 +32,18 @@ test("adapter preserves recipe conflicts, retry IDs and shopping batch IDs", asy
     await assert.rejects(api("/api/unknown"), /Ukjent/);
   } finally { backend.dispose(); setBackend(null); }
 });
+
+
+test("saved demo samples become editable recipes and retries remain idempotent", async () => {
+  const { examples } = await import('../lib/examples.ts');
+  const backend = createDemoBackend();
+  const input = { ...examples[0], id: 'saved-sample', version: null };
+  const first = await backend.saveRecipe(input, true);
+  assert.equal(first.example, undefined);
+  assert.equal((await backend.saveRecipe(input, true)).version, 1);
+  const changed = await backend.saveRecipe({ ...first, title: 'Edited sample' }, false);
+  assert.equal(changed.title, 'Edited sample');
+  assert.equal(changed.version, 2);
+  assert.equal((await backend.listRecipes()).length, 1);
+  backend.dispose();
+});

@@ -173,7 +173,7 @@ Bygget avviser ukjente demoflagg, ufullstendig Firebase-konfigurasjon og enhver
 Firebase-konfigurasjon i demo. Ferdige JavaScript-chunks kontrolleres: demo
 skal ikke inneholde Auth/Firebase, og vanlig bygg skal ikke inneholde
 sample-data eller demo-backend. Ukonfigurert vanlig bygg forblir låst.
-Dette er ikke en produksjonsklar backend eller en browser-E2E-test.
+Dette er ikke en produksjonsklar backend. Browser-E2E er beskrevet nedenfor.
 
 Enterprise-overføringen til `larry-software/julies-cookbook` er verifisert;
 repo-ID er `1418153196`. Origin og publisher-destinasjonen er oppdatert.
@@ -206,11 +206,12 @@ Runtime-vakten skal beholdes når Functions-versjonen endres.
 Denne leveransen bygger en innloggingsfrontend; ekte database/backend er ikke
 ferdig. CIR-143 kan ikke lukkes før følgende er levert og verifisert:
 
-1. Browser-E2E på isolerte data, inkludert UI og nettverksisolasjon. Nåværende
-   integrasjonstest dekker Auth/callables, ikke full nettleserflyt.
-2. Eget release-/produksjonsbygg som avviser helt manglende konfigurasjon og
-   feil målmiljø. Det nåværende ukonfigurerte ikke-demo-bygget er bevisst låst
-   og er kun et testartefakt; det er ikke releasegodkjenning.
+1. Full app-E2E mot valgt privat backend. Lokal Chromium-E2E dekker nå demo,
+   låst ikke-demo og den ekte EmailLogin-komponenten mot Auth/Functions,
+   men ingen produksjonsadapter finnes.
+2. Bind releasebyggets forventede prosjekt/domene til godkjent miljøkonfigurasjon.
+   `build:release` avviser nå manglende/delvis konfigurasjon, demo og avvik fra
+   eksplisitt forventet mål. CI bruker bare syntetiske verdier.
 3. Avhengighets- og hemmelighetsskanning som CI-kontroller.
 4. Eksplisitte staging-/produksjonsmiljøer og godkjente tilganger, med minste
    nødvendige deployrettigheter og kontroll av prosjekt/region/domene.
@@ -224,3 +225,32 @@ ferdig. CIR-143 kan ikke lukkes før følgende er levert og verifisert:
 Separat backendarbeid må levere privat adapter, database-/Storage-regler,
 varige bilder, autorisert import, korrekt utlogging/tilbakekalling og migrering.
 Et grønt frontendbygg erstatter ingen av disse leveransene.
+
+
+### Lokale browserkontroller og eksplisitt releasebygg
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH=node_modules/.cache/ms-playwright npx --no-install playwright install chromium
+PLAYWRIGHT_BROWSERS_PATH="$PWD/node_modules/.cache/ms-playwright" npm run test:e2e
+```
+
+Playwright er låst i npm-låsefilen og Chromium lastes fra Playwrights offisielle
+distribusjon. Testene bruker egne loopback-porter (4173–4175, 5001 og 9099),
+nekter gjenbruk av eksisterende webserver og avviser eksterne nettverkskall.
+Demo og låst inngang testes fra bygde filer. Auth testes i en separat, lokal
+HTML-fixture med den ekte EmailLogin-komponenten og ekte Auth/Functions-callables;
+fixturen inngår ikke i releasebygget. Dette er ikke full app-E2E mot privat lagring.
+Ingen skjermbilder eller private data lagres som leveranse.
+
+Browserkontrollene dekker lasting, importfeil, redigering, avbryt, gjentatt
+innsending, porsjonsberegning/handleliste, disponibel demo ved reload, deaktivert
+ukonfigurert innlogging samt ikke-invitert og ubekreftet konto.
+
+`npm run build:release` krever alle fire `VITE_FIREBASE_*` verdier, eksplisitt
+`VITE_COOKBOOK_DEMO=0`, og de ikke-klienteksponerte kontrollverdiene
+`COOKBOOK_EXPECTED_PROJECT_ID` og `COOKBOOK_EXPECTED_AUTH_DOMAIN`. De to siste
+må komme fra den godkjente målmiljøkonfigurasjonen og samsvare eksakt med
+webkonfigurasjonen; ikke utled dem automatisk fra samme ubekreftede input.
+Releaseporten velger ikke live prosjekt, og et vellykket bygg er ingen deploy-
+eller backendgodkjenning. Vanlig `build:non-demo` kan fortsatt bygge en låst
+inngang uten konfigurasjon for lokal kontroll.

@@ -16,7 +16,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "publish:github": "node scripts/publish-github.mjs",
     "build:demo": "npm run build -- --mode demo",
-    "build:non-demo": "npm run build -- --mode non-demo"
+    "build:non-demo": "npm run build -- --mode non-demo",
+    "build:release": "npm run build -- --mode release",
+    "test:e2e": "node scripts/test-e2e.mjs"
   },
   "dependencies": {
     "@fontsource/caveat": "5.3.0",
@@ -31,6 +33,7 @@
     "tesseract.js": "7.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "allowImportingTsExtensions": true,
@@ -11,8 +15,23 @@
     "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
-    "types": ["vite/client", "node"],
-    "paths": { "@/*": ["./*"] }
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
   },
-  "include": ["app", "lib", "tests/*.ts", "vite.config.ts"]
+  "include": [
+    "app",
+    "lib",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "scripts/build-policy.ts",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ]
 }

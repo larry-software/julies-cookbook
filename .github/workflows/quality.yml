@@ -23,6 +23,23 @@ jobs:
       - run: npm test
       - run: npm run test:auth
       - run: npm run test:ocr
+      - name: Install pinned Playwright Chromium
+        run: npx --no-install playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: node_modules/.cache/ms-playwright
+      - run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/node_modules/.cache/ms-playwright
+      - name: Validate explicit release target with synthetic values
+        run: npm run build:release
+        env:
+          VITE_COOKBOOK_DEMO: '0'
+          VITE_FIREBASE_API_KEY: fixture-api-key
+          VITE_FIREBASE_AUTH_DOMAIN: demo-julies-kokebok.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: demo-julies-kokebok
+          VITE_FIREBASE_APP_ID: fixture-app-id
+          COOKBOOK_EXPECTED_PROJECT_ID: demo-julies-kokebok
+          COOKBOOK_EXPECTED_AUTH_DOMAIN: demo-julies-kokebok.firebaseapp.com
       - name: Build locked, unconfigured entrance without demo data
         run: npm run build:non-demo
         env:
