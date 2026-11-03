@@ -63,7 +63,8 @@ npm ci --prefix functions
 npm --prefix functions run build
 npm run test:auth
 npm run test:ocr
-PAGES_BASE_PATH=/julies-cookbook/ VITE_COOKBOOK_DEMO=1 npm run build
+VITE_COOKBOOK_DEMO=0 npm run build:non-demo
+PAGES_BASE_PATH=/julies-cookbook/ VITE_COOKBOOK_DEMO=1 npm run build:demo
 ```
 
 Testene dekker norsk porsjonsberegning, ingredienser, importparsing,
@@ -71,7 +72,14 @@ handlelistegruppering, låst backend, samtidige redigeringer og stabile
 ID-er ved gjentatte forsøk. OCR-testen leser en ekte oppskriftsbildefil med
 norske og engelske språkfiler fra de installerte pakkene.
 
-Auth-emulatortesten bruker et isolert demoprosjekt. Den kontrollerer faktisk
+Auth-emulatortesten bruker et isolert demoprosjekt og faktisk callable-transport
+mellom Firebase-klienten og Auth-/Functions-emulatorene. Kun kompilert kode og
+syntetiske eksempeladresser kopieres til en midlertidig mappe; lokale `.env`-filer
+og cloud-credentials arves ikke. Firebase CLI er låst i `package-lock.json`.
+Functions beholder Node 22 og testes med låst Node 22.23.4 fra
+`functions/node_modules/node`. Emulatorens CLI og discovery-prosess får samme
+runtime; en midlertidig test-entrypoint avviser feil Node-major. Root-appen og
+testklienten beholder Node 24. Dette verifiserer lokal runtime, ikke skydeploy. Testen kontrollerer faktisk
 passordopprettelse, e-postbekreftelse, innlogging, feil passord, passordbytte
 og kontoer som allerede finnes uten passord. Den leser eller endrer ingen
 produksjonskontoer.
@@ -95,52 +103,49 @@ Vanlige besøkende kan ikke slå opp vilkårlige kontoer. Løsningen bruker ikke
 Firebase sin beskyttelse mot e-postoppslag er aktivert.
 
 For aktivering: kopier `.env.example` til en lokal `.env` og fyll inn
-webkonfigurasjonen. Sett samme fire `VITE_FIREBASE_*` verdier under repositoryets
-**Settings → Secrets and variables → Actions → Variables** for Pages-bygget.
+webkonfigurasjonen. Et fremtidig innloggingsbygg må få alle fire `VITE_FIREBASE_*` verdier.
+Det offentlige Pages-demobygget skal aldri få disse verdiene.
 Dette er offentlige Firebase-webverdier, ikke tjenestekontonøkler.
 Tilgangslisten `COOKBOOK_EMAILS` ligger i en ignorert `functions/.env` lokalt;
 en nedlastet kildekodepakke inneholder bare `functions/.env.example` og må
 få de to avtalte adressene før serverfunksjonene deployes.
 
 Aktiver e-post/passord i Firebase Auth, sett prosjektets passordpolicy til
-minst 12 tegn og legg til `larrycaw.github.io` som godkjent domene for
+minst 12 tegn og legg til det valgte frontend-domenet som godkjent domene for
 e-postlenker. Behold prosjektets eksisterende godkjente domener. Firebase sin
 innebygde side håndterer bekreftelses- og tilbakestillingslenkene og sender
 brukeren tilbake til kokeboken. Deploy `auth` og `functions:cookbook-auth`
-med `npx -y firebase-tools@latest deploy --project <prosjekt-id> --only auth,functions:cookbook-auth`
+med `npx --no-install firebase deploy --project <prosjekt-id> --only auth,functions:cookbook-auth`
 etter at prosjekt og konto er valgt. Serverfunksjonene ligger i `europe-west1`.
 Cloud Functions krever at prosjektet støtter funksjonsdeploy, vanligvis Blaze.
 
 ## GitHub Pages
 
-Demoen bruker det tilkoblede repositoryet `larrycaw/julies-cookbook` og er
-publisert på <https://larrycaw.github.io/julies-cookbook/>.
+Canonical enterprise-repository er <https://github.com/larry-software/julies-cookbook>.
+Repoet ble overført fra `larrycaw/julies-cookbook` med samme historikk og repo-ID.
+Den tidligere demo-adressen var `https://larrycaw.github.io/julies-cookbook/`.
+Ny Pages-publisering og adresse er ikke verifisert; midlertidig nedetid er akseptert.
 
-1. Bruk `julies-cookbook` under GitHub-kontoen `larrycaw`.
-2. Send denne checkouten til repositoryets `main`-gren.
-3. Pages er aktivert fra **gh-pages / (root)**. Behold denne innstillingen.
-4. Arbeidsflyten `.github/workflows/pages.yml` kjører tester, bygger appen og
-   sender `dist/` til `gh-pages` og ber GitHub bygge Pages. Stien følger
-   repositoryets navn automatisk.
+Arbeidsflyten `.github/workflows/pages.yml` bygger demo på push til `main` eller
+manuell kjøring og sender `dist/` til `gh-pages`. Grunnstien følger repo-navnet.
+PR-kontrollene publiserer ikke. Før neste publisering må Pages-kilde,
+rettigheter, signering og valgt adresse verifiseres under den nye organisasjonen.
 
-Med innlogget GitHub CLI og en ren, committet checkout kan gjeldende commit
-sendes til `main` med `npm run publish:github`. Pushen starter demo-arbeidsflyten.
-Skriptet overskriver ikke eksisterende Git-historikk. Resultatet kontrolleres
-i GitHub Actions.
-
-Den publiserte siden er en demo med midlertidige data. E-postinnloggingen og
-felles lagring trenger fortsatt et tilkoblet Firebase-prosjekt.
+Det eksisterende `npm run publish:github` peker nå til enterprise-repoet og
+forsøker en normal push av gjeldende commit til `main`. Det er ikke PR-flyten
+og skal bare brukes etter en egen releasebeslutning som tillater dette.
+Readiness-arbeid leveres via signert feature-branch og draft-PR, uten deploy.
+E-postinnlogging og felles lagring trenger fortsatt et valgt Firebase-prosjekt.
 
 ## Gjenstående Firebase-arbeid
 
 Før inngangen åpnes, må et valgt Firebase-prosjekt være tilgjengelig gjennom
-en autentisert CLI eller MCP-forbindelse. Det nåværende miljøet blokkerer
-`auth.firebase.tools`, og har ingen Firebase-innlogging eller prosjekt-ID.
+en autentisert CLI eller MCP-forbindelse. Live prosjekt og autorisert tilgang er ikke valgt i denne leveransen.
 
 1. Opprett eller velg Firebase-prosjekt og webapp; hent webkonfigurasjonen.
 2. Identifiser databasens utgave før valg av SDK og implementering av adapter.
 3. Aktiver e-post/passord, deploy innloggingsfunksjonene og legg
-   `larrycaw.github.io` til autoriserte domener. Legg også til `localhost`
+   det valgte frontend-domenet til autoriserte domener. Legg også til `localhost`
    ved lokal testing.
 4. Implementer en adapter for `CookbookBackend` med privat felles lagring,
    bilder, versjonskontroll og idempotente handlelisteoperasjoner.
@@ -155,3 +160,67 @@ en autentisert CLI eller MCP-forbindelse. Det nåværende miljøet blokkerer
    etter at ny privat lagring er verifisert.
 
 Ikke legg tjenestekontonøkler, CLI-tokens eller private oppskrifter i Git.
+
+## Kvalitetsport og enterprise-overføring
+
+`quality.yml` kjører på pull requests og hovedgrenen, og gjenbrukes av Pages.
+Den har kun lesetilgang og kjører TypeScript, enhetstester, Auth/Functions,
+OCR og tre bygg: ukonfigurert inngang, syntetisk konfigurert inngang og demo.
+Kun demoartefakten brukes av eksisterende Pages-publisering. Node og Actions
+har faste versjoner; CLI og avhengigheter installeres med `npm ci`.
+
+Bygget avviser ukjente demoflagg, ufullstendig Firebase-konfigurasjon og enhver
+Firebase-konfigurasjon i demo. Ferdige JavaScript-chunks kontrolleres: demo
+skal ikke inneholde Auth/Firebase, og vanlig bygg skal ikke inneholde
+sample-data eller demo-backend. Ukonfigurert vanlig bygg forblir låst.
+Dette er ikke en produksjonsklar backend eller en browser-E2E-test.
+
+Enterprise-overføringen til `larry-software/julies-cookbook` er verifisert;
+repo-ID er `1418153196`. Origin og publisher-destinasjonen er oppdatert.
+Midlertidig nedetid for offentlig demo er akseptert; gammel Pages-adresse
+trenger ikke bevares av hensyn til kontinuitet. Før eventuell publisering:
+
+- Verifiser Pages-adresse, `gh-pages`-kilde, Actions-rettigheter og enterprise
+  signerings-/grenregler før første publisering. Repo-navnbasert grunnsti
+  følger med automatisk. Ingen live Firebase/Auth-domener er endret.
+- Oppdater CORS-listen i `functions/src/index.ts`, Auth-domener og testens
+  returadresse når faktisk produksjons-/demo-adresse er valgt. Et repo-transfer
+  er ikke i seg selv en Firebase-domeneendring.
+- Gjør kvalitetssjekken påkrevd etter at den har kjørt i enterprise-repoet.
+  Lokal grønn status beviser ikke at GitHub-hostede jobber har kjørt.
+
+Neste backend-leveranse trenger valgt Firebase-prosjekt/databaseutgave,
+kostnadsramme og adresse. Implementer privat adapter og database-/Storage-regler
+med emulatorbaserte tilgangs- og konflikttester før varige bilder, migrering
+og verifisert produksjonsdeploy. Demo skal fortsatt kun inneholde eksempeldata.
+
+### Oppdatering av testverktøy
+
+Oppdater Node-patchversjonene og Firebase CLI i en egen PR. Verifiser upstream
+versjon/engine-krav, regenerer berørte låsefiler og kjør hele kvalitetsporten.
+Ved Actions-oppdateringer verifiser commit mot upstream-tag før pinnen endres.
+Runtime-vakten skal beholdes når Functions-versjonen endres.
+
+### Utstående akseptansekriterier i CIR-143
+
+Denne leveransen bygger en innloggingsfrontend; ekte database/backend er ikke
+ferdig. CIR-143 kan ikke lukkes før følgende er levert og verifisert:
+
+1. Browser-E2E på isolerte data, inkludert UI og nettverksisolasjon. Nåværende
+   integrasjonstest dekker Auth/callables, ikke full nettleserflyt.
+2. Eget release-/produksjonsbygg som avviser helt manglende konfigurasjon og
+   feil målmiljø. Det nåværende ukonfigurerte ikke-demo-bygget er bevisst låst
+   og er kun et testartefakt; det er ikke releasegodkjenning.
+3. Avhengighets- og hemmelighetsskanning som CI-kontroller.
+4. Eksplisitte staging-/produksjonsmiljøer og godkjente tilganger, med minste
+   nødvendige deployrettigheter og kontroll av prosjekt/region/domene.
+5. Dokumentert og testet rekkefølge for regler, indekser, funksjoner og frontend,
+   samt tilbakeføring til kjent commit.
+6. Godkjent release, faktisk utrulling til enterprise-mål, verifisert publisert
+   commit og smoke-test på den ekte ikke-demo-adressen.
+7. GitHub-hostet kjøring av kvalitetsporten etter overføring og nødvendige
+   påkrevde checks i enterprise-repoets grenregler.
+
+Separat backendarbeid må levere privat adapter, database-/Storage-regler,
+varige bilder, autorisert import, korrekt utlogging/tilbakekalling og migrering.
+Et grønt frontendbygg erstatter ingen av disse leveransene.
